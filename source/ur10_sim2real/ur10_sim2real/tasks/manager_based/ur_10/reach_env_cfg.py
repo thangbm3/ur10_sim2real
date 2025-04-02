@@ -23,6 +23,7 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import isaaclab_tasks.manager_based.manipulation.reach.mdp as mdp
 from ur10_sim2real.tasks.manager_based.ur_10.mdp.rewards import *
+import ur10_sim2real.tasks.manager_based.ur_10.mdp as mdp_ur10
 
 ##
 # Scene definition
@@ -73,9 +74,9 @@ class CommandsCfg:
         resampling_time_range=(4.0, 4.0),
         debug_vis=True,
         ranges=mdp.UniformPoseCommandCfg.Ranges(
-            pos_x=(0.35, 0.65),
+            pos_x=(0.25, 0.85),
             pos_y=(-0.2, 0.2),
-            pos_z=(0.15, 0.5),
+            pos_z=(0.15, 0.6),
             roll=(0.0, 0.0),
             pitch=MISSING,  # depends on end-effector axis
             yaw=(-3.14, 3.14),
@@ -112,6 +113,19 @@ class ObservationsCfg:
     # observation groups
     policy: PolicyCfg = PolicyCfg()
 
+    @configclass
+    class DebugCfg(ObsGroup):
+        """Observations for debug group."""
+
+        # observation terms (order preserved)
+        ee_v = ObsTerm(func=mdp_ur10.body_lin_vel, params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")})
+        ee_w = ObsTerm(
+            func=mdp_ur10.body_ang_vel, params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")}
+        )
+
+        def __post_init__(self):
+            self.concatenate_terms = True
+
 
 @configclass
 class EventCfg:
@@ -131,36 +145,78 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    # task terms
-    end_effector_position_tracking = RewTerm(
-        func=position_command_error,
-        weight=-0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
-    )
+    # # task terms
+    # end_effector_position_tracking = RewTerm(
+    #     func=position_command_error,
+    #     weight=-0.1,
+    #     params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+    # )
+    # end_effector_position_tracking_fine_grained = RewTerm(
+    #     func=mdp_ur10.position_command_error_tanh,
+    #     weight=0.2,
+    #     params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 0.1, "command_name": "ee_pose"},
+    # )
+    # # end_effector_orientation_tracking = RewTerm(
+    # #     func=orientation_command_error,
+    # #     weight=-0.1,
+    # #     params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+    # # )
+    # end_effector_orientation_tracking = RewTerm(
+    #     func=mdp_ur10.orientation_error_tanh,
+    #     weight=0.2,
+    #     params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link"),  "std": 1.2, "command_name": "ee_pose"},
+    # )
+    # joint_torque_stable = RewTerm(
+    #     func=mdp.joint_torques_l2,
+    #     weight=-3e-6,
+    #     params={"asset_cfg": SceneEntityCfg("robot")},
+    # )
+
+    # # action penalty
+    # action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.001)
+    # joint_vel = RewTerm(
+    #     func=mdp.joint_vel_l2,
+    #     weight=-0.0001,
+    #     params={"asset_cfg": SceneEntityCfg("robot")},
+    # )
     end_effector_position_tracking_fine_grained = RewTerm(
-        func=position_command_error_tanh,
-        weight=0.2,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "std": 0.1, "command_name": "ee_pose"},
+        func=mdp.position_command_error_tanh,
+        weight=10.0,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link"), "std": 0.25, "command_name": "ee_pose"},
     )
     end_effector_orientation_tracking = RewTerm(
-        func=orientation_command_error,
-        weight=-0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", body_names=MISSING), "command_name": "ee_pose"},
+        func=mdp_ur10.orientation_error_tanh,
+        weight=10.0,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link"),  "std": 1.2, "command_name": "ee_pose"},
     )
-    joint_torque_stable = RewTerm(
-        func=mdp.joint_torques_l2,
-        weight=-3e-6,
-        params={"asset_cfg": SceneEntityCfg("robot")},
+    orientation_bonus = RewTerm(
+        func=mdp_ur10.position_orientation_bonus,
+        weight=10.0,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link"), "command_name": "ee_pose"},
     )
 
-    # action penalty
-    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-0.001)
+    # penalties
+    ee_lin_velocity = RewTerm(
+        func=mdp_ur10.body_lin_vel_l2,
+        weight=-0.5,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")},
+    )
+    ee_ang_velocity = RewTerm(
+        func=mdp_ur10.body_ang_vel_l2,
+        weight=-0.7,
+        params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")},
+    )
+    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-5e-3)
     joint_vel = RewTerm(
         func=mdp.joint_vel_l2,
-        weight=-0.0001,
+        weight=-1e-3,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
-
+    joint_torque = RewTerm(
+        func=mdp.joint_torques_l2,
+        weight=-7e-4,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
 
 @configclass
 class TerminationsCfg:

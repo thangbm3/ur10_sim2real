@@ -10,15 +10,12 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 
 @configclass
 class UR10ReachPPORunnerCfg(RslRlOnPolicyRunnerCfg):
-
-    num_steps_per_env = 24
+    num_steps_per_env = 28
     max_iterations = 10000
     save_interval = 50
     experiment_name = "reach_ur10"
     run_name = ""
-    # resume = True
-    # load_checkpoint = "model_400.pt"
-    # load_run = "2025-03-29_18-04-55"
+    resume = False
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=1.0,
@@ -40,3 +37,9 @@ class UR10ReachPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         desired_kl=0.01,
         max_grad_norm=1.0,
     )
+
+@configclass
+class UR10ReachPPORunnerPlayCfg(UR10ReachPPORunnerCfg):
+    resume = False
+    # load_run = "2025-03-31_23-19-16"
+    # load_checkpoint = "model_400.pt"

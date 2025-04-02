@@ -1,2 +1,1 @@
-
-from robots.universal_robots import *
+from .robots import *
