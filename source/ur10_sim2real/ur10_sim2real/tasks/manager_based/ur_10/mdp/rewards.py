@@ -16,6 +16,10 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
+def action_acc_l2(env) -> torch.Tensor:
+    """Penalize the rate of change of the actions using L2 squared kernel."""
+    return torch.sum(torch.square(env.action_manager.action - 2.0 * env.action_manager.prev_action + env.action_manager.prev_2_action), dim=1)
+
 def position_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     """Penalize tracking of the position error using L2-norm.
 
@@ -33,8 +37,8 @@ def position_command_error(env: ManagerBasedRLEnv, command_name: str, asset_cfg:
     # compute the position error
     error = torch.norm(curr_pos_w - des_pos_w, dim=1)
     # apply deadzone
-    return torch.where(error > 0.02, error, torch.zeros_like(error))
-    # return torch.norm(curr_pos_w - des_pos_w, dim=1)
+    # return torch.where(error > 0.02, error, torch.zeros_like(error))
+    return torch.norm(curr_pos_w - des_pos_w, dim=1)
 
 
 def position_command_error_tanh(

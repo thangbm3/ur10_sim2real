@@ -30,7 +30,7 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 # Pre-defined configs
 ##
 # from isaaclab_assets import UR10_CFG  # isort: skip
-from ur10_sim2real.assets.universal_robots import UR10_CFG
+from ur10_sim2real.assets.universal_robots import UR10_CFG  # isort: skip
 
 import ur10_sim2real.tasks.manager_based.ur_10.mdp as custom_mdp
 
@@ -48,6 +48,12 @@ class ActionsCfg:
         scale=1.0, 
         use_default_offset=True
     )
+    # arm_action = mdp.JointVelocityActionCfg(
+    #     asset_name="robot",
+    #     joint_names=[".*"],
+    #     scale=1.0,
+    #     use_default_offset=True
+    # )
 
 
 @configclass
@@ -58,10 +64,24 @@ class EventCfg:
         func=mdp.reset_joints_by_offset,
         mode="reset",
         params={
-            "position_range": (-3.14, 3.14),
+            "position_range": (-1.57, 1.57),
             "velocity_range": (-1.0, 1.0),
         },
     )
+
+
+# @configclass
+# class PlayEventCfg(EventCfg):
+#     """Configuration for events."""
+
+#     reset_robot_joints = EventTerm(
+#         func=mdp.reset_joints_by_offset,
+#         mode="play",
+#         params={
+#             "position_range": (-0.5, 0.5),
+#             "velocity_range": (-0.5, 0.5),
+#         },
+#     )
 
 
 @configclass
@@ -70,18 +90,18 @@ class RewardsCfg:
 
     # task terms
     # end_effector_position_tracking = RewTerm(
-    #     func=mdp.position_command_error,
-    #     weight=-0.2,
+    #     func=custom_mdp.position_command_error,
+    #     weight=-2,
     #     params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link"), "command_name": "ee_pose"},
     # )
     end_effector_position_tracking_fine_grained = RewTerm(
         func=custom_mdp.position_command_error_tanh,
-        weight=10.0,
+        weight=5.0,
         params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link"), "std": 0.25, "command_name": "ee_pose"},
     )
     end_effector_orientation_tracking = RewTerm(
         func=custom_mdp.orientation_error_tanh,
-        weight=10.0,
+        weight=5.0,
         params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link"),  "std": 1.2, "command_name": "ee_pose"},
     )
     orientation_bonus = RewTerm(
@@ -101,7 +121,17 @@ class RewardsCfg:
         weight=-0.7,
         params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")},
     )
-    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-5e-3)
+
+    action = RewTerm(
+        func=mdp.action_l2,
+        weight=-1e-4
+    )
+    action_rate = RewTerm(func=mdp.action_rate_l2, weight=-5e-1)
+    action_acc = RewTerm(
+        func=custom_mdp.action_acc_l2,
+        weight=-1e-2,
+    )
+    
     joint_vel = RewTerm(
         func=mdp.joint_vel_l2,
         weight=-1e-3,
@@ -110,6 +140,11 @@ class RewardsCfg:
     joint_torque = RewTerm(
         func=mdp.joint_torques_l2,
         weight=-7e-4,
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+    joint_acceleration = RewTerm(
+        func=mdp.joint_acc_l2,
+        weight=-4e-4,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
@@ -123,10 +158,10 @@ class CommandsCfg:
         resampling_time_range=(5.0, 5.0),
         debug_vis=False,
         ranges=mdp.UniformPoseCommandCfg.Ranges(
-            pos_x=(-0.8, -0.1),
-            pos_y=(-0.6, 0.0),
+            pos_x=(0.2, 1.0),
+            pos_y=(0.2, 0.6),
             pos_z=(0.15, 0.7),
-            roll=(0.0, 0.0),
+            roll=(-math.pi / 2, math.pi / 2),
             pitch=(math.pi / 4, 3*math.pi / 4),  # depends on end-effector axis
             yaw=(-math.pi / 2, math.pi / 2),  #
         ),
@@ -143,6 +178,11 @@ class ObservationsCfg:
         # observation terms (order preserved)
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        # pose_real = ObsTerm(
+        #     func=custom_mdp.body_pose_w,
+        #     params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")},
+        #     noise=Unoise(n_min=-0.01, n_max=0.01),
+        # )
         pose_command = ObsTerm(func=mdp.generated_commands, params={"command_name": "ee_pose"})
         actions = ObsTerm(func=mdp.last_action)
 
@@ -158,6 +198,9 @@ class ObservationsCfg:
         ee_v = ObsTerm(func=custom_mdp.body_lin_vel, params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")})
         ee_w = ObsTerm(
             func=custom_mdp.body_ang_vel, params={"asset_cfg": SceneEntityCfg("robot", body_names="ee_link")}
+        )
+        joint_acc = ObsTerm(
+            func=custom_mdp.joint_acc, params={"asset_cfg": SceneEntityCfg("robot")}
         )
 
         def __post_init__(self):
@@ -220,3 +263,5 @@ class UR10ReachEnvCfg_PLAY(UR10ReachEnvCfg):
 
         # enable debug visualization for ee pose command
         self.commands.ee_pose.debug_vis = True
+
+        self.event.reset_robot_joints = None

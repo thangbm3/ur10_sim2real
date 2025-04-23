@@ -13,7 +13,7 @@ from . import agents
 
 gym.register(
     id="Isaac-Reach-UR10-Train-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    entry_point="ur10_sim2real.tasks.manager_based.ur_10.joint_pos_env:CustomManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": f"{__name__}.joint_pos_env_cfg:UR10ReachEnvCfg",
@@ -23,7 +23,7 @@ gym.register(
 
 gym.register(
     id="Isaac-Reach-UR10-Play-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    entry_point="ur10_sim2real.tasks.manager_based.ur_10.joint_pos_env:CustomManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": f"{__name__}.joint_pos_env_cfg:UR10ReachEnvCfg_PLAY",
